@@ -5,7 +5,14 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+authors.workspace = true
 description = "The Veer language toolchain: check, plan, and run KV-context-typed inference programs"
+
+[package.metadata.wix]
+upgrade-guid = "BBBD9B96-94C5-4CAA-833E-39B6D52E9D9D"
+path-guid = "962EB476-88E4-477B-A670-B9C4EF062BBA"
+license = false
+eula = false
 
 [[bin]]
 name = "veer"
@@ -22,3 +29,6 @@ serde_json.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+
+[package.metadata.dist]
+include = ["../../examples/"]

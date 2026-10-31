@@ -1,0 +1,55 @@
+# Cuts a patch release every Monday if anything changed since the last tag.
+# Pushing the tag (with GH_RELEASES_TOKEN, so it triggers other workflows)
+# starts release.yml, which builds and publishes to veermshah/veer-site.
+name: Scheduled release
+on:
+  schedule:
+    - cron: "0 15 * * 1"
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version part to bump"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_RELEASES_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Decide whether to release
+        id: check
+        run: |
+          last=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          if [ -n "$last" ] && [ -z "$(git log "$last"..HEAD --oneline)" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "No changes since $last; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run tests
+        if: steps.check.outputs.skip != 'true'
+        run: cargo test --workspace
+      - name: Bump version, commit, tag
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          cur=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          IFS=. read -r major minor patch <<< "$cur"
+          case "${{ inputs.bump || 'patch' }}" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            *) patch=$((patch+1)) ;;
+          esac
+          # The first release ships the current version as-is.
+          if ! git describe --tags --abbrev=0 --match 'v*' >/dev/null 2>&1; then new="$cur"; else new="$major.$minor.$patch"; fi
+          sed -i "0,/^version = \".*\"/s//version = \"$new\"/" Cargo.toml
+          sed -i "s/\(veer-[a-z]* = { path = \"crates\/veer-[a-z]*\", version = \)\"[^\"]*\"/\1\"$new\"/" Cargo.toml
+          cargo update --workspace
+          git config user.name "Veer Shah"
+          git config user.email "84329659+veermshah@users.noreply.github.com"
+          git commit -am "Release v$new" || true
+          git tag "v$new"
+          git push origin HEAD "v$new"
