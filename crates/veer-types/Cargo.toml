@@ -1,0 +1,11 @@
+[package]
+name = "veer-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Veer language: types"
+
+[dependencies]
+veer-syntax.workspace = true
+veer-numerics.workspace = true

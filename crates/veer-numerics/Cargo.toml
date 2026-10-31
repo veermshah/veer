@@ -1,0 +1,12 @@
+[package]
+name = "veer-numerics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Veer language: numerics"
+
+[dependencies]
+
+[dev-dependencies]
+proptest.workspace = true

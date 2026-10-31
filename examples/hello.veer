@@ -1,0 +1,9 @@
+// The smallest Veer program: open a context, generate, release it.
+model tiny = "Qwen/Qwen2.5-0.5B-Instruct" { layers: 24, kv_heads: 2, head_dim: 64, kv: bf16 }
+
+fn main() {
+  let c = open tiny ++ "Say hello to Veer in five words:"
+  let (c, reply) = gen c max 16
+  print(reply)
+  drop c
+}

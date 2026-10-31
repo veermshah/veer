@@ -1,0 +1,25 @@
+// An agent loop whose tool outputs are large. After each step the bulky
+// observation is replaced by a short note *in the KV cache* (splice), so the
+// context stays small, the way Leyline-style KV editing proposes.
+model llama = "meta-llama/Llama-3.1-8B-Instruct" { layers: 32, kv_heads: 8, head_dim: 128, kv: bf16, max_ctx: 32768 }
+
+prefix AGENT: llama = "You are a debugging agent. Use the search tool, then answer."
+
+tool search(query: str<=128) -> str<=2048
+
+@budget(kv = 1GiB, prefill = 20000)
+fn main() {
+  let c = open AGENT ++ "\nTask: find why the cache test is flaky.\n"
+  for step in 0..3 {
+    let (c2, q) = gen c ++ "\nSearch query:" max 32 stop "\n"
+    let obs = search(q)
+    let c3 = c2 ++ "\nObservation: " ++ #[obs] obs
+    let (c4, note) = gen c3 ++ "\nOne-line takeaway:" max 48
+    // Keep the takeaway, drop the 2 KB observation from the cache.
+    c = splice c4 at obs with "(observation summarized)"
+    print("step", step, "->", note)
+  }
+  let (c, answer) = gen c ++ "\nFinal answer:" max 128
+  print(answer)
+  drop c
+}

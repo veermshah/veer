@@ -1,0 +1,38 @@
+// Code review with a shared document prefix, structured output, an in-place
+// edit of the context (splice), and a transactional speculative patch.
+model llama = "meta-llama/Llama-3.1-8B-Instruct" {
+  layers: 32, kv_heads: 8, head_dim: 128, kv: fp8_e4m3, block: 16, max_ctx: 131072
+}
+
+prefix SYS: llama = "You are a careful senior code reviewer. Be concise."
+
+schema Bugs {
+  count: int,
+  items: [str<=80; <=8],
+}
+
+fn looks_valid(patch: str<=64) -> bool {
+  return contains(patch, "fix") || len(patch) > 8
+}
+
+@budget(kv = 2GiB, prefill = 12000)
+fn review(doc: str<=4096) -> str<=384 {
+  let c = open SYS ++ "\n<document>\n" ++ #[doc] doc ++ "\n</document>\n"
+  let (a, b) = fork c                       // both branches share SYS + doc (no copy)
+  let (a, summary) = gen a ++ "Summarize the change:" max 128
+  drop a
+  let (b, bugs) = gen b ++ "List the bugs as JSON:" max 256 as json<Bugs>
+  // The document is no longer needed in b's context: replace it in place.
+  let b = splice b at doc with "<document elided>"
+  let (b, patch) = speculate b {
+    let (b, p) = gen b ++ "Propose a one-line patch:" max 64
+    if looks_valid(p) { commit (b, p) } else { rollback "no patch" }
+  }
+  drop b
+  return summary + " | patch: " + patch
+}
+
+fn main() {
+  let out = review("fn add(a: i32, b: i32) -> i32 { a - b }  // adds two numbers")
+  print(out)
+}

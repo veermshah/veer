@@ -1,0 +1,13 @@
+[package]
+name = "veer-plan"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Veer language: plan"
+
+[dependencies]
+veer-syntax.workspace = true
+veer-types.workspace = true
+serde.workspace = true
+serde_json.workspace = true

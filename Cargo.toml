@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/veermshah/veer"
+homepage = "https://veermshah.github.io/veer"
+authors = ["Veer Shah"]
+
+[workspace.dependencies]
+veer-syntax = { path = "crates/veer-syntax", version = "0.1.0" }
+veer-numerics = { path = "crates/veer-numerics", version = "0.1.0" }
+veer-types = { path = "crates/veer-types", version = "0.1.0" }
+veer-plan = { path = "crates/veer-plan", version = "0.1.0" }
+veer-runtime = { path = "crates/veer-runtime", version = "0.1.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+ureq = { version = "3", features = ["json"] }
+proptest = "1"
+insta = "1"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"

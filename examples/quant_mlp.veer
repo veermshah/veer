@@ -1,0 +1,40 @@
+// The precision layer: number formats and error bounds live in the types.
+// `veer types` prints each function's inferred bound; @accuracy turns it into
+// a compile-time contract. Bounds are sound worst cases (every input in range,
+// every rounding adversarial), so they are larger than typical measured error.
+
+// NVFP4 weights: worst-case relative error ≈ 0.20 (e4m3 block scales, 16-wide blocks).
+@accuracy(rel <= 0.25)
+fn mlp_nvfp4(x: Tensor<[1, 64], f32, abs<=1.0>, w: Tensor<[64, 32], f32, abs<=0.5>) -> Tensor<[1, 32], f32> {
+  return (quant(x, bf16) @ quant(w, nvfp4)) |> silu
+}
+
+// INT8 weights: ≈ 0.009 worst case.
+@accuracy(rel <= 0.01)
+fn mlp_int8(x: Tensor<[1, 64], f32, abs<=1.0>, w: Tensor<[64, 32], f32, abs<=0.5>) -> Tensor<[1, 32], f32> {
+  return (quant(x, bf16) @ quant(w, int8)) |> silu
+}
+
+// OCP MXFP4 can clamp a block's largest values (amax/scale ∈ [4, 8) but E2M1 tops out at 6),
+// so its bound is ≈ 0.55. Overflow-aware scaling (mxfp4_oas) removes the clamp: ≈ 0.37.
+// Try adding `@accuracy(rel <= 0.25)` to either one: the compiler rejects it (V0301).
+fn mlp_mxfp4(x: Tensor<[1, 64], f32, abs<=1.0>, w: Tensor<[64, 32], f32, abs<=0.5>) -> Tensor<[1, 32], f32> {
+  return (quant(x, bf16) @ quant(w, mxfp4)) |> silu
+}
+
+fn mlp_mxfp4_oas(x: Tensor<[1, 64], f32, abs<=1.0>, w: Tensor<[64, 32], f32, abs<=0.5>) -> Tensor<[1, 32], f32> {
+  return (quant(x, bf16) @ quant(w, mxfp4_oas)) |> silu
+}
+
+fn main() {
+  let x = rand_uniform([1, 64], -1.0, 1.0, 7)
+  let w = rand_uniform([64, 32], -0.5, 0.5, 42)
+  let a = mlp_nvfp4(x, w)
+  let b = mlp_int8(x, w)
+  let c = mlp_mxfp4(x, w)
+  let d = mlp_mxfp4_oas(x, w)
+  report(a)
+  report(b)
+  report(c)
+  report(d)
+}

@@ -1,0 +1,19 @@
+[package]
+name = "veer-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Veer language: runtime"
+
+[dependencies]
+veer-syntax.workspace = true
+veer-types.workspace = true
+veer-numerics.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ureq.workspace = true
+
+[dev-dependencies]
+veer-plan.workspace = true
+proptest.workspace = true

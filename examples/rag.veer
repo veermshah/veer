@@ -1,0 +1,27 @@
+// Many questions over one retrieved document: the document is prefilled once
+// and every question forks from it.
+model mistral = "mistralai/Mistral-7B-Instruct-v0.3" { layers: 32, kv_heads: 8, head_dim: 128, kv: fp8_e4m3 }
+
+prefix SYS: mistral = "Answer strictly from the provided document."
+
+tool retrieve(topic: str<=64) -> str<=3000
+
+fn ask(doc_ctx: Ctx<mistral>, q: str<=200) -> (Ctx<mistral>, str<=160) {
+  let (keep, branch) = fork doc_ctx
+  let (branch, a) = gen branch ++ "\nQ: " ++ q ++ "\nA:" max 160
+  drop branch
+  return (keep, a)
+}
+
+@budget(kv = 768MiB)
+fn main() {
+  let doc = retrieve("paged attention")
+  let c = open SYS ++ "\n" ++ doc
+  let (c, a1) = ask(c, "What problem does paging solve?")
+  let (c, a2) = ask(c, "What is the block size trade-off?")
+  let (c, a3) = ask(c, "How does copy-on-write work here?")
+  print(a1)
+  print(a2)
+  print(a3)
+  drop c
+}

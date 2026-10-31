@@ -1,0 +1,28 @@
+// Tree of thought: one shared problem prefix, WIDTH branches explored
+// level by level, each judged with a constrained choice.
+model qwen = "Qwen/Qwen2.5-7B-Instruct" { layers: 28, kv_heads: 4, head_dim: 128, kv: bf16 }
+
+prefix TASK: qwen = "Problem: schedule 5 jobs on 2 machines to minimize makespan. Think step by step."
+
+const WIDTH = 3
+const DEPTH = 2
+
+@budget(kv = 512MiB)
+fn main() {
+  let best: str<=96 = ""
+  let root = open TASK
+  for level in 0..DEPTH {
+    for i in 0..WIDTH {
+      let (keep, branch) = fork root
+      root = keep
+      let (branch, thought) = gen branch ++ "\nNext step:" max 96
+      let (branch, verdict) = gen branch ++ "\nIs this step promising?" max 4 as choice["yes", "no"]
+      if verdict == "yes" { best = thought }
+      drop branch
+    }
+    let (r, step) = gen root ++ "\nCommit to the best step:" max 64
+    root = r
+  }
+  print("best thought:", best)
+  drop root
+}

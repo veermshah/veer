@@ -1,0 +1,24 @@
+[package]
+name = "veer-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "The Veer language toolchain: check, plan, and run KV-context-typed inference programs"
+
+[[bin]]
+name = "veer"
+path = "src/main.rs"
+
+[dependencies]
+veer-syntax.workspace = true
+veer-types.workspace = true
+veer-plan.workspace = true
+veer-runtime.workspace = true
+veer-numerics.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
