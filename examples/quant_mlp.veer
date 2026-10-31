@@ -3,7 +3,7 @@
 // a compile-time contract. Bounds are sound worst cases (every input in range,
 // every rounding adversarial), so they are larger than typical measured error.
 
-// NVFP4 weights: worst-case relative error ≈ 0.20 (e4m3 block scales, 16-wide blocks).
+// NVFP4 weights: worst-case relative error ≈ 0.20.
 @accuracy(rel <= 0.25)
 fn mlp_nvfp4(x: Tensor<[1, 64], f32, abs<=1.0>, w: Tensor<[64, 32], f32, abs<=0.5>) -> Tensor<[1, 32], f32> {
   return (quant(x, bf16) @ quant(w, nvfp4)) |> silu
@@ -15,9 +15,12 @@ fn mlp_int8(x: Tensor<[1, 64], f32, abs<=1.0>, w: Tensor<[64, 32], f32, abs<=0.5
   return (quant(x, bf16) @ quant(w, int8)) |> silu
 }
 
-// OCP MXFP4 can clamp a block's largest values (amax/scale ∈ [4, 8) but E2M1 tops out at 6),
-// so its bound is ≈ 0.55. Overflow-aware scaling (mxfp4_oas) removes the clamp: ≈ 0.37.
-// Try adding `@accuracy(rel <= 0.25)` to either one: the compiler rejects it (V0301).
+// MXFP4 uses power-of-two (E8M0) block scales, which waste up to half of the E2M1
+// range, so its worst case is 0.25 x block max: about 0.28 here, enough to fail
+// the 0.25 contract that NVFP4 (E4M3 scales, 16-wide blocks) meets.
+// Try adding `@accuracy(rel <= 0.25)` below: the compiler rejects it (V0301).
+// OCP scaling clamps the largest values; overflow-aware scaling (mxfp4_oas) never
+// clamps. Same worst case, but OAS avoids the systematic bias on the biggest values.
 fn mlp_mxfp4(x: Tensor<[1, 64], f32, abs<=1.0>, w: Tensor<[64, 32], f32, abs<=0.5>) -> Tensor<[1, 32], f32> {
   return (quant(x, bf16) @ quant(w, mxfp4)) |> silu
 }

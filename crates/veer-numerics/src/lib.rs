@@ -162,10 +162,12 @@ impl Format {
             Format::Fp8E5m2 => ErrModel::PerElement { u: E5M2.u(), floor: E5M2.floor(), max: E5M2.max },
             // scale = amax/127, error ≤ scale/2; small slack for f32 storage of q·scale.
             Format::Int8 => ErrModel::Scaled { c: 1.0 / 254.0 + 2.0 * U32 },
-            // amax/scale ∈ [4, 8): values in (6, 8) clamp to 6 → error up to 2·scale ≤ amax/2.
-            Format::Mxfp4 => ErrModel::Scaled { c: 0.5 + 2.0 * U32 },
-            // amax/scale ∈ (3, 6]: no clamping; half-spacing 1·scale < amax/3.
-            Format::Mxfp4Oas => ErrModel::Scaled { c: 1.0 / 3.0 + 2.0 * U32 },
+            // amax/scale ∈ [4, 8). Rounding in [4, 6] errs by ≤ 1·scale ≤ amax/4;
+            // clamping x ∈ (6, 8)·scale to 6·scale errs by x − 6·scale < amax/4.
+            Format::Mxfp4 => ErrModel::Scaled { c: 0.25 + 2.0 * U32 },
+            // amax/scale ∈ (3, 6]: never clamps; rounding errs by ≤ 1·scale, and
+            // that only happens when amax ≥ 4·scale, so again ≤ amax/4.
+            Format::Mxfp4Oas => ErrModel::Scaled { c: 0.25 + 2.0 * U32 },
             // e4m3 scale rounding (≤ 1/16 rel) → error ≤ (17/96)·bmax, plus a tiny
             // subnormal-scale floor relative to the tensor max.
             Format::Nvfp4 => ErrModel::Scaled { c: 17.0 / 96.0 + 3e-6 + 2.0 * U32 },

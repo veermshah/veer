@@ -145,6 +145,10 @@ struct Planner<'a> {
     peak: f64,
     peak_span: Option<Span>,
     live_at_peak: Vec<LiveCtx>,
+    /// (ctx id, tokens, shared tokens) at the peak; names resolved at the end.
+    peak_ids: Vec<(CtxId, u64, u64)>,
+    /// Variable name each context id was (last) bound to.
+    names: HashMap<CtxId, String>,
     trace: Vec<TraceOp>,
     seg_uses: HashMap<SegId, Vec<usize>>,
     forks: Vec<ForkShare>,
@@ -176,6 +180,8 @@ pub fn plan_fn(prog: &Program, ck: &Checked, src: &Source, name: &str) -> Option
         peak: 0.0,
         peak_span: None,
         live_at_peak: vec![],
+        peak_ids: vec![],
+        names: HashMap::new(),
         trace: vec![],
         seg_uses: HashMap::new(),
         forks: vec![],
@@ -230,6 +236,13 @@ pub fn plan_fn(prog: &Program, ck: &Checked, src: &Source, name: &str) -> Option
         p.diags.push(Diagnostic::error("V0200", f.name.span, "program too large to plan (more than 2,000,000 abstract steps)"));
     }
     let (prefill, decode) = final_state.as_ref().map(|(s, _)| (s.prefill, s.decode)).unwrap_or((0, 0));
+    let mut live: Vec<LiveCtx> = p
+        .peak_ids
+        .iter()
+        .map(|(id, t, sh)| LiveCtx { var: p.names.get(id).cloned().unwrap_or_else(|| "(temporary)".into()), tokens: *t, shared_tokens: *sh })
+        .collect();
+    live.sort_by(|a, b| a.var.cmp(&b.var));
+    p.live_at_peak = live;
 
     // Budgets.
     if let Some(b) = info.budget.kv_bytes {
@@ -389,33 +402,17 @@ impl<'a> Planner<'a> {
         if m > self.peak {
             self.peak = m;
             self.peak_span = Some(span);
-            // Describe live contexts by variable name where possible.
-            let mut names: HashMap<CtxId, String> = HashMap::new();
-            for sc in &st.scopes {
-                for (n, v) in sc {
-                    collect_ctx_names(n, v, &mut names);
-                }
-            }
-            for h in &st.hidden {
-                names.entry(*h).or_insert_with(|| "(speculation original)".into());
-            }
             let mut counts: HashMap<SegId, usize> = HashMap::new();
             for c in st.ctxs.values() {
                 for s in &c.segs {
                     *counts.entry(*s).or_default() += 1;
                 }
             }
-            let mut live: Vec<LiveCtx> = st
+            self.peak_ids = st
                 .ctxs
                 .iter()
-                .map(|(id, c)| LiveCtx {
-                    var: names.get(id).cloned().unwrap_or_else(|| "(temporary)".into()),
-                    tokens: self.ctx_tokens(c),
-                    shared_tokens: c.segs.iter().filter(|s| counts[s] > 1 || self.segs[s].pinned).map(|s| self.segs[s].tokens).sum(),
-                })
+                .map(|(id, c)| (*id, self.ctx_tokens(c), c.segs.iter().filter(|s| counts[s] > 1 || self.segs[s].pinned).map(|s| self.segs[s].tokens).sum()))
                 .collect();
-            live.sort_by(|a, b| a.var.cmp(&b.var));
-            self.live_at_peak = live;
         }
     }
 
@@ -574,6 +571,7 @@ impl<'a> Planner<'a> {
     fn bind(&mut self, st: &mut State, pat: &Pattern, v: AVal) {
         match (pat, v) {
             (Pattern::Ident(id), v) => {
+                collect_ctx_names(&id.name, &v, &mut self.names);
                 st.scopes.last_mut().unwrap().insert(id.name.clone(), v);
             }
             (Pattern::Tuple(ps, _), AVal::Tuple(vs)) => {
@@ -593,6 +591,7 @@ impl<'a> Planner<'a> {
     fn assign(&mut self, st: &mut State, pat: &Pattern, v: AVal) {
         match (pat, v) {
             (Pattern::Ident(id), v) => {
+                collect_ctx_names(&id.name, &v, &mut self.names);
                 for sc in st.scopes.iter_mut().rev() {
                     if let Some(slot) = sc.get_mut(&id.name) {
                         *slot = v;

@@ -122,6 +122,7 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
                 eprintln!("\n{errors} error(s)");
                 return Ok(ExitCode::from(1));
             }
+            let plans: Vec<_> = plans.into_iter().filter(|p| !p.trace.is_empty()).collect();
             println!("ok: {} function(s) checked, {} planned", ck.fns.len(), plans.len());
             for p in &plans {
                 let budget = p.budget_kv_bytes.map(|b| format!(" / budget {}", human_bytes(b as f64))).unwrap_or_default();
