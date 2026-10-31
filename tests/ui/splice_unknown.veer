@@ -1,0 +1,8 @@
+// expect: V0120
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+fn main() {
+  let c = open m ++ #[doc] "text"
+  let c = splice c at doc with "x"
+  let c = splice c at doc with "y"
+  drop c
+}

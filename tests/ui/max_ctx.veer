@@ -1,0 +1,10 @@
+// expect: V0202
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8, max_ctx: 100 }
+fn main() {
+  let c = open m
+  for i in 0..4 {
+    let (d, s) = gen c max 40
+    c = d
+  }
+  drop c
+}

@@ -1,0 +1,8 @@
+// expect: V0200
+model big = "x" { layers: 80, kv_heads: 8, head_dim: 128, kv: bf16 }
+@budget(kv = 256MiB)
+fn main() {
+  let c = open big
+  let (c, s) = gen c ++ "Write a long essay." max 4000
+  drop c
+}

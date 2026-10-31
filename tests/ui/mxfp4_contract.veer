@@ -1,0 +1,5 @@
+// expect: V0301
+@accuracy(rel <= 0.25)
+fn f(x: Tensor<[1, 64], f32, abs<=1.0>, w: Tensor<[64, 8], f32, abs<=1.0>) -> Tensor<[1, 8], f32> {
+  return quant(x, bf16) @ quant(w, mxfp4)
+}

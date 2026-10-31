@@ -1,0 +1,9 @@
+// expect: V0104
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+fn main() {
+  let c = open m
+  for i in 0..3 {
+    c = c ++ #[note] "step"
+  }
+  drop c
+}

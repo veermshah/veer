@@ -1,0 +1,7 @@
+// expect: V0103
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+fn main() {
+  let c = open m
+  let (c, s) = gen c max 8
+  if contains(s, "yes") { drop c } else { print("kept") }
+}
