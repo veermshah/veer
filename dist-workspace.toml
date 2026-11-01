@@ -22,3 +22,7 @@ install-updater = false
 github-releases-repo = "veermshah/veer-site"
 # Don't upload this private repo's source to the public release.
 source-tarball = false
+
+# macOS 14 runner images are retired (Nov 2026); build Apple Silicon on macOS 15.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
