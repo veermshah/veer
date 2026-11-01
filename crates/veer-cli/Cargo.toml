@@ -22,7 +22,7 @@ path = "src/main.rs"
 veer-syntax.workspace = true
 veer-types.workspace = true
 veer-plan.workspace = true
-veer-runtime.workspace = true
+veer-runtime = { workspace = true, features = ["http"] }
 veer-numerics.workspace = true
 clap.workspace = true
 serde_json.workspace = true

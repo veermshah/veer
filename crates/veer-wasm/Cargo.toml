@@ -1,0 +1,22 @@
+[package]
+name = "veer-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Veer compiled to WebAssembly for the browser playground"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+veer-syntax.workspace = true
+veer-types.workspace = true
+veer-plan.workspace = true
+veer-runtime.workspace = true
+serde_json.workspace = true
+wasm-bindgen.workspace = true
+
+[package.metadata.dist]
+dist = false

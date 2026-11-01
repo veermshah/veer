@@ -5,5 +5,7 @@ pub mod engine;
 pub mod interp;
 pub mod store;
 
-pub use engine::{http_engine, sim_engine, Dialect, Engine, EngineStats};
+#[cfg(feature = "http")]
+pub use engine::http_engine;
+pub use engine::{sim_engine, Dialect, Engine, EngineStats};
 pub use interp::{Interp, RuntimeError, ToolImpl, Value};

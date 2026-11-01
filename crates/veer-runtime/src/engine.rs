@@ -5,6 +5,7 @@
 
 use crate::store::{CtxId, ModelGeom, Store, StoreStats};
 use serde_json::{json, Value as Json};
+#[cfg(feature = "http")]
 use std::time::Duration;
 
 /// Shape of a structured (`json<T>`) output.
@@ -263,6 +264,7 @@ impl Dialect {
     }
 }
 
+#[cfg(feature = "http")]
 pub struct HttpBackend {
     pub endpoint: String,
     pub dialect: Dialect,
@@ -274,6 +276,7 @@ pub struct HttpBackend {
     cached_tokens: Option<u64>,
 }
 
+#[cfg(feature = "http")]
 impl HttpBackend {
     pub fn new(endpoint: &str, dialect: Dialect, api_key: Option<String>, model_override: Option<String>) -> Self {
         let agent: ureq::Agent = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(600))).http_status_as_error(false).build().into();
@@ -320,6 +323,7 @@ impl HttpBackend {
     }
 }
 
+#[cfg(feature = "http")]
 fn regex_escape(s: &str) -> String {
     let mut o = String::new();
     for c in s.chars() {
@@ -331,6 +335,7 @@ fn regex_escape(s: &str) -> String {
     o
 }
 
+#[cfg(feature = "http")]
 impl Backend for HttpBackend {
     fn name(&self) -> &'static str {
         "http"
@@ -377,6 +382,7 @@ impl Backend for HttpBackend {
     }
 }
 
+#[cfg(feature = "http")]
 pub fn http_engine(endpoint: &str, dialect: Dialect, api_key: Option<String>, model_override: Option<String>) -> StoreEngine<HttpBackend> {
     StoreEngine::new(HttpBackend::new(endpoint, dialect, api_key, model_override))
 }
