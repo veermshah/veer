@@ -1,0 +1,9 @@
+// expect: V0404
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+prefix SYS: m = "Classify."
+tool fetch(url: str<=64) -> str<=512
+fn main() {
+  let (c, label) = gen open SYS ++ fetch("https://example.com") max 16
+  drop c
+  let l = endorse(label)   // free text: constrain it with `as choice[...]` first
+}

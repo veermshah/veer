@@ -1,0 +1,12 @@
+// expect: V0400
+// A web page decides who gets the email: a classic indirect prompt injection.
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+prefix SYS: m = "You are an email assistant."
+tool fetch(url: str<=64) -> str<=512
+@privileged tool send_email(to: str<=64, body: str<=512) -> str<=16
+fn main() {
+  let page = fetch("https://example.com/meeting")
+  let (c, to) = gen open SYS ++ page ++ "\nWho should get the notes?" max 32
+  drop c
+  let r = send_email(to, "Meeting notes attached.")
+}

@@ -139,8 +139,8 @@ impl Parser {
         while self.at(&Tok::At) {
             attrs.push(self.attr()?);
         }
-        if !attrs.is_empty() && !self.at_kw(Kw::Fn) {
-            return self.err("`fn` after attribute");
+        if !attrs.is_empty() && !self.at_kw(Kw::Fn) && !self.at_kw(Kw::Tool) {
+            return self.err("`fn` or `tool` after attribute");
         }
         match self.peek() {
             Tok::Kw(Kw::Model) => {
@@ -193,7 +193,7 @@ impl Parser {
                 let params = self.params()?;
                 self.expect(&Tok::Arrow, "`->`")?;
                 let ret = self.ty()?;
-                Ok(Item::Tool(ToolDecl { name, params, ret, span: start.to(self.prev_span()) }))
+                Ok(Item::Tool(ToolDecl { name, attrs, params, ret, span: start.to(self.prev_span()) }))
             }
             Tok::Kw(Kw::Schema) => {
                 self.bump();
@@ -354,7 +354,18 @@ impl Parser {
             }
             _ => return self.err("a type"),
         };
-        Ok(TypeExpr { kind, span: start.to(self.prev_span()) })
+        // Trailing information-flow labels: `@trusted`, `@secret`, ... An `@name(`
+        // or an unknown name belongs to the next item's attribute instead.
+        let mut labels = Vec::new();
+        while self.at(&Tok::At) {
+            let is_label = matches!(self.peek_at(1), Tok::Ident(n) if FLOW_LABELS.contains(&n.as_str())) && !matches!(self.peek_at(2), Tok::LParen);
+            if !is_label {
+                break;
+            }
+            self.bump();
+            labels.push(self.ident()?);
+        }
+        Ok(TypeExpr { kind, labels, span: start.to(self.prev_span()) })
     }
 
     // ----------------------------------------------------------- statements

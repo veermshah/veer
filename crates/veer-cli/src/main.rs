@@ -63,6 +63,17 @@ enum Cmd {
     },
     /// Print the inferred signature of every function (including tensor error bounds).
     Types { file: PathBuf },
+    /// Security audit: which untrusted or secret data can reach which privileged or egress tools,
+    /// and how many bits of untrusted influence `endorse` admits. Exits 1 on any violation.
+    Audit {
+        file: PathBuf,
+        /// Audit only this function (default: every function no other function calls).
+        #[arg(long)]
+        entry: Option<String>,
+        /// Emit JSON (for CI gates and dashboards).
+        #[arg(long)]
+        json: bool,
+    },
     /// Explain a diagnostic code, e.g. `veer explain V0101`.
     Explain {
         code: Option<String>,
@@ -172,6 +183,7 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
             }
             Ok(ExitCode::SUCCESS)
         }
+        Cmd::Audit { file, entry, json } => audit(&file, entry.as_deref(), json),
         Cmd::Explain { code, markdown_dir } => {
             if let Some(dir) = markdown_dir {
                 std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -318,4 +330,107 @@ fn parse_args(params: &[(String, Ty)], args: &[String]) -> Result<Vec<Value>, St
         return Err(format!("unknown argument `{k}`"));
     }
     Ok(out)
+}
+
+fn label_json(l: veer_types::flow::Label) -> serde_json::Value {
+    serde_json::json!({ "trusted": !l.untrusted, "public": !l.secret })
+}
+
+fn audit(file: &Path, entry: Option<&str>, json: bool) -> Result<ExitCode, String> {
+    use veer_types::flow::{analyze, fmt_bits};
+    let src = load(file)?;
+    // Type errors stop the audit; information-flow violations are part of its output.
+    let prog = match veer_syntax::parse(&src.text) {
+        Ok(p) => p,
+        Err(d) => {
+            eprint!("{}", render_all(&[d], &src));
+            return Ok(ExitCode::from(1));
+        }
+    };
+    let (ck, diags) = veer_types::check(&prog);
+    if diags.iter().any(|d| d.is_error()) {
+        eprint!("{}", render_all(&diags, &src));
+        return Ok(ExitCode::from(1));
+    }
+    let (report, flow_diags) = analyze(&prog, &ck);
+    let fns: Vec<_> = report.fns.iter().filter(|f| match entry {
+        Some(e) => f.name == e,
+        None => f.root,
+    }).collect();
+    if fns.is_empty() {
+        return Err(format!("no function `{}`", entry.unwrap_or("main")));
+    }
+    let line = |s: veer_syntax::Span| src.line_col(s.start).0 + 1;
+    let errors = flow_diags.iter().filter(|d| d.is_error()).count();
+    if json {
+        let v: Vec<serde_json::Value> = fns
+            .iter()
+            .map(|f| {
+                serde_json::json!({
+                    "function": f.name,
+                    "sources": f.sources.iter().map(|s| serde_json::json!({"tool": s.tool, "line": line(s.span), "label": label_json(s.label)})).collect::<Vec<_>>(),
+                    "sinks": f.sinks.iter().map(|s| serde_json::json!({
+                        "tool": s.tool, "line": line(s.span), "privileged": s.privileged, "egress": s.egress,
+                        "decided_by": label_json(s.pc), "ok": s.ok,
+                        "args": s.args.iter().map(|(n, l)| serde_json::json!({"name": n, "label": label_json(*l)})).collect::<Vec<_>>(),
+                    })).collect::<Vec<_>>(),
+                    "casts": f.casts.iter().map(|c| serde_json::json!({"kind": c.kind, "line": line(c.span), "options": c.options, "bits": c.bits, "times": c.times})).collect::<Vec<_>>(),
+                    "endorsed_bits": f.endorsed_bits,
+                    "budget_bits": f.budget_bits,
+                    "ok": f.sinks.iter().all(|s| s.ok),
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&serde_json::json!({"file": src.name, "violations": errors, "functions": v})).unwrap());
+    } else {
+        println!("security audit: {}", src.name);
+        for f in &fns {
+            println!("\nfn {}", f.name);
+            if f.sources.is_empty() {
+                println!("  sources   none (no untrusted or secret tool output)");
+            }
+            for s in &f.sources {
+                println!("  source    line {:<4} {:<16} {}", line(s.span), s.tool, s.label.describe());
+            }
+            if f.sinks.is_empty() {
+                println!("  sinks     none (no @privileged or @egress tools called)");
+            }
+            for s in &f.sinks {
+                let kind = match (s.privileged, s.egress) {
+                    (true, true) => "privileged+egress",
+                    (true, false) => "privileged",
+                    _ => "egress",
+                };
+                let args: Vec<String> = s.args.iter().map(|(n, l)| format!("{n}={}", l.describe())).collect();
+                println!("  {} sink    line {:<4} {:<16} {kind}; decided by {}; {}", if s.ok { "✓" } else { "✗" }, line(s.span), s.tool, s.pc.describe(), args.join(", "));
+            }
+            for c in &f.casts {
+                match c.kind {
+                    "endorse" => println!(
+                        "  endorse   line {:<4} {} value(s), {} bit(s) x {} run(s)",
+                        line(c.span),
+                        c.options.map(|o| o.to_string()).unwrap_or_else(|| "unbounded".into()),
+                        fmt_bits(c.bits),
+                        c.times
+                    ),
+                    _ => println!("  declassify line {}", line(c.span)),
+                }
+            }
+            let ok = f.sinks.iter().all(|s| s.ok);
+            let budget = f.budget_bits.map(|b| format!(" (budget {b})")).unwrap_or_default();
+            if ok {
+                if f.endorsed_bits > 0.0 {
+                    println!("  verdict   untrusted data steers privileged actions only through {} endorsed bit(s){budget}; no secret data reaches egress", fmt_bits(f.endorsed_bits));
+                } else {
+                    println!("  verdict   no untrusted data can influence a privileged action, and no secret data reaches egress");
+                }
+            } else {
+                println!("  verdict   VIOLATIONS (see below)");
+            }
+        }
+        if !flow_diags.is_empty() {
+            eprint!("\n{}", render_all(&flow_diags, &src));
+        }
+    }
+    Ok(if errors > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS })
 }

@@ -2,6 +2,7 @@
 //! and the precision (number format + error bound) layer.
 
 pub mod check;
+pub mod flow;
 pub mod ty;
 
 pub use check::{check, Accuracy, Budget, Checked, ConstVal, FnInfo, ModelInfo, PrefixInfo, Sig};
@@ -13,7 +14,11 @@ use veer_syntax::Diagnostic;
 /// Parse and check a source file. Warnings are returned alongside a successful result.
 pub fn frontend(src: &str) -> Result<(Program, Checked, Vec<Diagnostic>), Vec<Diagnostic>> {
     let prog = veer_syntax::parse(src).map_err(|d| vec![d])?;
-    let (checked, diags) = check(&prog);
+    let (checked, mut diags) = check(&prog);
+    if !diags.iter().any(|d| d.is_error()) {
+        // Information flow is only meaningful on a well-typed program.
+        diags.extend(flow::analyze(&prog, &checked).1);
+    }
     if diags.iter().any(|d| d.is_error()) {
         Err(diags)
     } else {

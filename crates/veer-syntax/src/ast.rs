@@ -59,6 +59,8 @@ pub struct PrefixDecl {
 #[derive(Clone, Debug)]
 pub struct ToolDecl {
     pub name: Ident,
+    /// `@privileged`, `@egress` (information-flow sinks).
+    pub attrs: Vec<Attr>,
     pub params: Vec<Param>,
     pub ret: TypeExpr,
     pub span: Span,
@@ -133,8 +135,13 @@ pub enum TypeExprKind {
 #[derive(Clone, Debug)]
 pub struct TypeExpr {
     pub kind: TypeExprKind,
+    /// Information-flow labels written after the type: `str<=64 @trusted @secret`.
+    pub labels: Vec<Ident>,
     pub span: Span,
 }
+
+/// Label names accepted after a type (`@trusted`, `@untrusted`, `@secret`, `@public`).
+pub const FLOW_LABELS: &[&str] = &["trusted", "untrusted", "secret", "public"];
 
 #[derive(Clone, Debug)]
 pub struct Block {

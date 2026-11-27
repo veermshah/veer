@@ -72,3 +72,27 @@ fn explain_and_version() {
     assert_eq!(code, 0);
     assert!(out.starts_with("veer "));
 }
+
+#[test]
+fn audit_certifies_the_inbox_agent() {
+    let (code, out, err) = veer(&["audit", "examples/inbox_agent.veer"]);
+    assert_eq!(code, 0, "{out}\n{err}");
+    assert!(out.contains("✓ sink") && !out.contains("✗"), "{out}");
+    assert!(out.contains("6.34 endorsed bit(s)"), "{out}");
+    let (code, out, _) = veer(&["audit", "examples/inbox_agent.veer", "--json"]);
+    assert_eq!(code, 0);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["violations"], 0);
+    let f = &v["functions"][0];
+    assert_eq!(f["ok"], true);
+    assert_eq!(f["sinks"].as_array().unwrap().len(), 3);
+    assert!(f["endorsed_bits"].as_f64().unwrap() <= f["budget_bits"].as_f64().unwrap());
+}
+
+#[test]
+fn audit_reports_violations_with_exit_code_1() {
+    let (code, out, err) = veer(&["audit", "tests/ui/flow_injected_recipient.veer"]);
+    assert_eq!(code, 1);
+    assert!(out.contains("✗ sink"), "{out}");
+    assert!(err.contains("[V0400]"), "{err}");
+}

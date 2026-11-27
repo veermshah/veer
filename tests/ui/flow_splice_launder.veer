@@ -1,0 +1,14 @@
+// expect: V0400
+// Splicing out the page does not undo its influence on the instruction that
+// was prefilled after it (that KV attended to the page).
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+prefix SYS: m = "You are an email assistant."
+tool fetch(url: str<=64) -> str<=512
+@privileged tool send_email(to: str<=64, body: str<=512) -> str<=16
+fn main() {
+  let c = open SYS ++ #[page] fetch("https://example.com") ++ "\nWrite a reply."
+  let c = splice c at page with "(page removed)"
+  let (c, body) = gen c max 256
+  drop c
+  let r = send_email("boss@example.com", body)
+}

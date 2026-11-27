@@ -142,6 +142,38 @@ codes! {
 "V0303", "unknown number format",
 "Formats are: f32, bf16, f16, fp8_e4m3, fp8_e5m2, int8, mxfp4, mxfp4_oas, nvfp4.",
 "";
+
+"V0400", "untrusted data reaches a trusted position",
+"Veer tracks where every value came from. Tool results are untrusted by default (they may contain text an attacker wrote, such as a web page or an email), and anything computed from untrusted data is untrusted too: a `gen` over a context that holds untrusted text, a string built from it, a branch taken because of it. A parameter of a `@privileged` tool, a parameter or return type marked `@trusted`, or a `let` annotated `@trusted` may only receive trusted data. This is what stops a prompt injection from choosing, say, the recipient of an email. Constrain the value to a fixed set of options and `endorse` it, or restructure the program so the trusted value comes from the user or the program itself.",
+"tool fetch(url: str<=64) -> str<=256\n@privileged tool send(to: str<=64) -> str<=8\nmodel m = \"x\" { layers: 1, kv_heads: 1, head_dim: 8 }\nfn main() {\n  let page = fetch(\"https://example.com\")\n  let (c, to) = gen open m ++ page ++ \"Recipient:\" max 16\n  drop c\n  let r = send(to)   // `to` was chosen by text on the page\n}";
+
+"V0401", "privileged action controlled by untrusted data",
+"A `@privileged` tool is called inside an `if`, loop, or speculation whose path depends on untrusted data. Even if every argument is trusted, an attacker could decide *whether* the action happens. Decide on trusted data, or `endorse` a constrained choice first.",
+"tool fetch(url: str<=64) -> str<=256\n@privileged tool delete_all() -> str<=8\nfn main() {\n  let page = fetch(\"https://example.com\")\n  if contains(page, \"please delete\") { let r = delete_all() }\n}";
+
+"V0402", "secret data reaches a public position",
+"Data from a tool declared `-> ... @secret` (and everything derived from it, including LLM output over a context that contains it) may not be passed to an `@egress` tool or to a parameter or return marked `@public`. This stops exfiltration: an injected instruction cannot make the agent send private data out. Use `declassify` on trusted data when releasing it is intended.",
+"tool inbox() -> str<=512 @secret\n@egress tool post(text: str<=512) -> str<=8\nfn main() {\n  let mail = inbox()\n  let r = post(mail)\n}";
+
+"V0403", "egress controlled by secret data",
+"An `@egress` tool is called on a path that depends on secret data, so whether (or how often) it runs reveals that data.",
+"tool inbox() -> str<=512 @secret\n@egress tool ping() -> str<=8\nfn main() {\n  if contains(inbox(), \"bank\") { let r = ping() }\n}";
+
+"V0404", "cannot endorse a value of unbounded capacity",
+"`endorse(x)` upgrades untrusted data to trusted. That is only safe when every value `x` could take is one the program is prepared to act on, so Veer requires `x` to range over a finite, statically known set: a `bool`, a `gen ... as choice[...]`, or a string literal chosen between branches. Free text and numbers cannot be endorsed; constrain them first.",
+"tool fetch(url: str<=64) -> str<=256\nfn main() {\n  let page = fetch(\"https://example.com\")\n  let p = endorse(page)\n}";
+
+"V0405", "endorse or declassify depends on untrusted data",
+"Robust declassification: the decision to endorse or declassify must not itself be controlled by an attacker, so `endorse` and `declassify` are rejected on paths that depend on untrusted data.",
+"tool fetch(url: str<=64) -> str<=256\nfn main() {\n  let page = fetch(\"https://example.com\")\n  if contains(page, \"x\") { let b = endorse(true) }\n}";
+
+"V0406", "endorsement budget exceeded",
+"`@budget(endorse = N bits)` bounds how much untrusted data can steer trusted decisions. Each `endorse` of a value with k possible values admits log2(k) bits, multiplied by how many times it can run (loop trip counts and calls). The total for this function exceeds the budget.",
+"";
+
+"V0407", "declassifying untrusted data",
+"`declassify(x)` releases secret data as public. If `x` is also untrusted, an attacker could choose what is released (for example an injected instruction asking to summarize a different email), so only trusted values may be declassified.",
+"tool inbox() -> str<=512 @secret\nfn main() {\n  let d = declassify(inbox())\n}";
 }
 
 pub fn lookup(code: &str) -> Option<&'static CodeInfo> {

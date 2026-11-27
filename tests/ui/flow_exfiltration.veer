@@ -1,0 +1,11 @@
+// expect: V0402
+// An LLM that has read private mail must not write to the outside world.
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+prefix SYS: m = "Summarize."
+tool inbox() -> str<=1024 @secret
+@egress tool http_get(url: str<=128) -> str<=64
+fn main() {
+  let (c, url) = gen open SYS ++ inbox() ++ "\nURL to check:" max 128
+  drop c
+  let r = http_get(url)
+}

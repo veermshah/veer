@@ -1,0 +1,7 @@
+// expect: V0407
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+tool inbox() -> str<=1024 @secret
+@egress tool post(text: str<=1024) -> str<=8
+fn main() {
+  let r = post(declassify(inbox()))   // the attacker could choose what is released
+}
