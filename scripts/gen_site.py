@@ -55,7 +55,15 @@ EXAMPLES = [
      ["`veer types` prints each function's inferred bound. NVFP4 is about 0.20 relative, MXFP4 about 0.28, INT8 about 0.009.",
       "Adding `@accuracy(rel <= 0.25)` to `mlp_mxfp4` is a compile error (`V0301`): power-of-two block scales cost accuracy that E4M3 scales don't.",
       "`report` shows measured error next to the bound. The bound is a guarantee over all inputs in range, so it's larger than typical error."]),
-    ("hello", "Hello, Veer", 6,
+    ("inbox_agent", "A prompt-injection-safe email agent", 6,
+     "An email triage agent where emails are untrusted and secret. Each email is read inside a `speculate` that always rolls back, "
+     "so the agent's context never holds email text; only an endorsed three-way choice escapes. `veer audit` certifies that no email "
+     "can choose a privileged action except through those choices, and that no email content can reach the outgoing mail.",
+     ["`tool read_email(...) -> str<=1024 @secret` is untrusted (the default for tools) and secret.",
+      "`speculate base { ... rollback v }` restores the exact KV state: `base` is still trusted afterwards, `v` is not.",
+      "`endorse(verdict)` is accepted because `verdict` is one of three known strings: log2(3) ≈ 1.58 bits per email, 6.34 in total, under `@budget(endorse = 8bits)`.",
+      "Making the status mail mention what the emails said would be rejected: `send_email` is `@egress`, so secret data cannot reach it (V0402)."]),
+    ("hello", "Hello, Veer", 7,
      "The smallest complete program, also used in the [Quickstart](/start/quickstart/).", []),
 ]
 

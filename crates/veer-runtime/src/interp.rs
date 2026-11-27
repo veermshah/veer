@@ -104,6 +104,8 @@ pub enum ToolImpl {
     Command(String),
     /// Deterministic stand-in used when no command is bound.
     Echo,
+    /// An in-process implementation (used by embedders and by the noninterference tests).
+    Func(Box<dyn FnMut(&[Value]) -> String>),
 }
 
 pub struct Interp<'a> {
@@ -115,11 +117,13 @@ pub struct Interp<'a> {
     specs: Vec<usize>,
     pub output: Vec<String>,
     pub echo: bool,
+    /// Every tool call made, in order: (tool, rendered arguments).
+    pub tool_log: Vec<(String, Vec<String>)>,
 }
 
 impl<'a> Interp<'a> {
     pub fn new(prog: &'a Program, ck: &'a Checked, engine: &'a mut dyn Engine) -> Self {
-        Interp { prog, ck, engine, tools: HashMap::new(), scopes: vec![], specs: vec![], output: vec![], echo: true }
+        Interp { prog, ck, engine, tools: HashMap::new(), scopes: vec![], specs: vec![], output: vec![], echo: true, tool_log: vec![] }
     }
 
     pub fn bind_tool(&mut self, name: &str, imp: ToolImpl) {
@@ -543,6 +547,8 @@ impl<'a> Interp<'a> {
                 let b = self.str_of(&args[1])?;
                 Value::Bool(a.contains(&b))
             }
+            // Information-flow casts: checked statically, identity at run time.
+            "endorse" | "declassify" => self.eval(&args[0])?,
             "to_str" => Value::Str(truncate_tokens(&self.eval(&args[0])?.to_string(), 24)),
             "trim" => Value::Str(self.str_of(&args[0])?.trim().to_string()),
             "rand_uniform" => {
@@ -623,7 +629,9 @@ impl<'a> Interp<'a> {
 
     fn run_tool(&mut self, name: &str, params: &[(String, Ty)], vals: &[Value]) -> Result<String, String> {
         let args: serde_json::Map<String, serde_json::Value> = params.iter().zip(vals).map(|((k, _), v)| (k.clone(), value_to_json(v))).collect();
-        match self.tools.get(name).unwrap_or(&ToolImpl::Echo) {
+        self.tool_log.push((name.to_string(), vals.iter().map(|v| v.to_string()).collect()));
+        match self.tools.get_mut(name).unwrap_or(&mut ToolImpl::Echo) {
+            ToolImpl::Func(f) => Ok(f(vals)),
             ToolImpl::Echo => {
                 let parts: Vec<String> = vals.iter().map(|v| v.to_string()).collect();
                 Ok(format!("[{name} result for: {}]", parts.join(", ")))

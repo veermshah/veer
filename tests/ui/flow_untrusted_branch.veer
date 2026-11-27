@@ -1,0 +1,8 @@
+// expect: V0401
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+tool fetch(url: str<=64) -> str<=512
+@privileged tool delete_repo(name: str<=32) -> str<=16
+fn main() {
+  let issue = fetch("https://example.com/issue/1")
+  if contains(issue, "clean up") { let r = delete_repo("prod") }
+}

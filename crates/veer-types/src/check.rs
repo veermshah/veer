@@ -47,6 +47,8 @@ pub struct Sig {
 pub struct Budget {
     pub kv_bytes: Option<u64>,
     pub prefill: Option<u64>,
+    /// Upper bound on bits of untrusted influence admitted by `endorse`.
+    pub endorse_bits: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -155,7 +157,7 @@ pub fn const_eval(consts: &HashMap<String, ConstVal>, e: &Expr) -> Option<ConstV
 }
 
 pub const BUILTINS: &[&str] = &[
-    "print", "len", "contains", "to_str", "trim", "rand_uniform", "zeros", "quant", "matmul", "add", "scale", "relu", "silu", "measured_err", "report",
+    "print", "len", "contains", "to_str", "trim", "rand_uniform", "zeros", "quant", "matmul", "add", "scale", "relu", "silu", "measured_err", "report", "endorse", "declassify",
 ];
 
 // --------------------------------------------------------------------------
@@ -266,6 +268,13 @@ impl<'a> Checker<'a> {
                     self.out.prefixes.insert(p.name.name.clone(), PrefixInfo { name: p.name.name.clone(), model: p.model.name.clone(), text: p.text.clone() });
                 }
                 Item::Tool(t) => {
+                    for a in &t.attrs {
+                        match a.name.name.as_str() {
+                            "privileged" | "egress" if a.args.is_empty() => {}
+                            "privileged" | "egress" => self.err("V0118", a.span, format!("`@{}` takes no arguments", a.name.name)),
+                            other => self.err("V0118", a.name.span, format!("unknown tool attribute `@{other}` (expected `@privileged` or `@egress`)")),
+                        }
+                    }
                     let params = t.params.iter().map(|p| (p.name.name.clone(), self.resolve_ty(&p.ty))).collect::<Vec<_>>();
                     let ret = self.resolve_ty(&t.ret);
                     for (p, (_, ty)) in t.params.iter().zip(&params) {
@@ -387,7 +396,8 @@ impl<'a> Checker<'a> {
                         match arg.key.name.as_str() {
                             "kv" => b.kv_bytes = val,
                             "prefill" => b.prefill = val,
-                            _ => self.err("V0118", arg.key.span, "budget keys are `kv` and `prefill`"),
+                            "endorse" => b.endorse_bits = val,
+                            _ => self.err("V0118", arg.key.span, "budget keys are `kv`, `prefill` and `endorse`"),
                         }
                     }
                 }
@@ -418,6 +428,10 @@ impl<'a> Checker<'a> {
     }
 
     pub fn resolve_ty(&mut self, t: &TypeExpr) -> Ty {
+        let has = |n: &str| t.labels.iter().any(|l| l.name == n);
+        if (has("trusted") && has("untrusted")) || (has("secret") && has("public")) {
+            self.err("V0118", t.span, "conflicting information-flow labels");
+        }
         match &t.kind {
             TypeExprKind::Str(b) => Ty::Str(*b),
             TypeExprKind::Int => Ty::Int,
@@ -1435,6 +1449,17 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+            "endorse" | "declassify" => {
+                if !arity(self, 1) {
+                    return Ty::Error;
+                }
+                let t = self.expr(&args[0]);
+                if t.contains_ctx() {
+                    self.err("V0110", args[0].span, format!("`{n}` applies to data, not contexts"));
+                    return Ty::Error;
+                }
+                t
+            }
             "measured_err" | "report" => {
                 if !arity(self, 1) {
                     return Ty::Error;
@@ -1496,7 +1521,7 @@ fn unit_mult(s: Option<&str>) -> Option<u64> {
         Some("MiB") => 1 << 20,
         Some("GiB") => 1 << 30,
         Some("TiB") => 1 << 40,
-        Some("tokens") | Some("tok") => 1,
+        Some("tokens") | Some("tok") | Some("bits") | Some("bit") => 1,
         _ => return None,
     })
 }
@@ -1525,7 +1550,7 @@ fn topo(n: &str, g: &HashMap<String, Vec<(String, Span)>>, st: &mut HashMap<Stri
     order.push(n.to_string());
 }
 
-fn collect_calls_block(b: &Block, out: &mut Vec<(String, Span)>) {
+pub fn collect_calls_block(b: &Block, out: &mut Vec<(String, Span)>) {
     for s in &b.stmts {
         match &s.kind {
             StmtKind::Let { value, .. } | StmtKind::Assign { value, .. } | StmtKind::Expr(value) | StmtKind::Commit(value) | StmtKind::Rollback(value) => collect_calls(value, out),

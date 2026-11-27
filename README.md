@@ -30,6 +30,7 @@ LLM programs (agents, RAG, tree search) are bottlenecked by KV-cache memory and 
 
 - **Linear contexts.** `Ctx<M>` values are consumed by every operation (`++`, `gen`, `fork`, `splice`, `speculate`, `drop`). Leaks, use-after-free, and ambiguous edits are compile errors.
 - **Static KV planner.** An abstract interpreter proves sound upper bounds on peak KV bytes, prefill and decode tokens, context length, and splice re-prefill cost, and emits the context DAG plus reuse hints. `@budget(kv = …, prefill = …)` is a compile-time contract.
+- **Prompt-injection safety by construction.** Every value is labelled trusted/untrusted and public/secret. Tool output is untrusted; `@privileged` tools only accept trusted data and `@egress` tools never receive secrets. Labels follow the KV cache (a `splice` cannot launder what later tokens attended to; `speculate { ... rollback }` is a static quarantine), and `endorse` admits a constrained `choice` under a bit budget. `veer audit` prints the certificate. See [docs/information-flow.md](docs/information-flow.md).
 - **Precision types.** `Tensor<[64, 32], nvfp4, abs<=…, err<=…>` carries a proven error bound through quantization, matmul, and activations. `@accuracy(rel <= 0.25)` is a compile-time contract across FP8, INT8, MXFP4, and NVFP4.
 
 See the [research survey](https://veer-lang.vercel.app/research/) for the papers behind each feature (SGLang, KVFlow, Leyline, AAFLOW+, transactional KV for speculative decoding, MXFP4/NVFP4 error analyses).
@@ -40,16 +41,17 @@ See the [research survey](https://veer-lang.vercel.app/research/) for the papers
 |---|---|
 | `veer-syntax` | lexer, parser, AST, diagnostics, error-code registry |
 | `veer-numerics` | number formats, bit-exact quantization simulators, sound error-bound algebra |
-| `veer-types` | type checker: linearity, token bounds, spans (must/may), speculation, tensor bounds |
+| `veer-types` | type checker: linearity, token bounds, spans (must/may), speculation, tensor bounds, information flow |
 | `veer-plan` | static planner (abstract interpretation over paged KV segments) |
 | `veer-runtime` | paged context store, `sim` and OpenAI-compatible `http` engines, interpreter |
-| `veer-cli` | the `veer` binary: `check`, `plan`, `run`, `types`, `explain` |
+| `veer-cli` | the `veer` binary: `check`, `plan`, `run`, `types`, `audit`, `explain` |
 
 ## Develop
 
 ```sh
-cargo test --workspace                 # unit, soundness property tests, CLI, HTTP mock
+cargo test --workspace                 # unit, soundness and noninterference property tests, CLI, HTTP mock
 cargo run -p veer-cli -- run examples/review.veer --stats
+cargo run -p veer-cli -- audit examples/inbox_agent.veer
 python3 scripts/gen_site.py            # regenerate cookbook + error pages in ../veer-site
 python3 scripts/check_docs.py          # compile every program in the docs
 ```

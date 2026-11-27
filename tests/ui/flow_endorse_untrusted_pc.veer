@@ -1,0 +1,7 @@
+// expect: V0405
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+tool fetch(url: str<=64) -> str<=512
+fn main() {
+  let page = fetch("https://example.com")
+  if contains(page, "trust me") { let ok = endorse(true) }
+}

@@ -1,0 +1,13 @@
+// expect: V0406
+model m = "x" { layers: 1, kv_heads: 1, head_dim: 8 }
+prefix SYS: m = "Triage this message."
+tool fetch(url: str<=64) -> str<=512
+@privileged tool archive(id: str<=8) -> str<=8
+@budget(endorse = 4bits)
+fn main() {
+  for i in 0..8 {
+    let (c, v) = gen open SYS ++ fetch("https://example.com") max 8 as choice["spam", "ham"]
+    drop c
+    if endorse(v) == "spam" { let r = archive("x") }
+  }
+}
