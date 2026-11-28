@@ -1094,7 +1094,7 @@ checksum = "3a3b425286980a367278453f3b6d28cdcb134b574e5a35824a6ff5eebad50bb6"
 
 [[package]]
 name = "veer-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "insta",
@@ -1108,14 +1108,14 @@ dependencies = [
 
 [[package]]
 name = "veer-numerics"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "veer-plan"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1125,7 +1125,7 @@ dependencies = [
 
 [[package]]
 name = "veer-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proptest",
  "serde",
@@ -1139,11 +1139,11 @@ dependencies = [
 
 [[package]]
 name = "veer-syntax"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "veer-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "veer-numerics",
  "veer-syntax",
@@ -1151,7 +1151,7 @@ dependencies = [
 
 [[package]]
 name = "veer-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "veer-plan",
