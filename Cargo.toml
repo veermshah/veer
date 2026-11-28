@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/veermshah/veer"
@@ -11,11 +11,11 @@ homepage = "https://veer-lang.vercel.app"
 authors = ["Veer Shah"]
 
 [workspace.dependencies]
-veer-syntax = { path = "crates/veer-syntax", version = "0.1.0" }
-veer-numerics = { path = "crates/veer-numerics", version = "0.1.0" }
-veer-types = { path = "crates/veer-types", version = "0.1.0" }
-veer-plan = { path = "crates/veer-plan", version = "0.1.0" }
-veer-runtime = { path = "crates/veer-runtime", version = "0.1.0", default-features = false }
+veer-syntax = { path = "crates/veer-syntax", version = "0.2.0" }
+veer-numerics = { path = "crates/veer-numerics", version = "0.2.0" }
+veer-types = { path = "crates/veer-types", version = "0.2.0" }
+veer-plan = { path = "crates/veer-plan", version = "0.2.0" }
+veer-runtime = { path = "crates/veer-runtime", version = "0.2.0", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 clap = { version = "4", features = ["derive"] }
